@@ -77,6 +77,19 @@ def save_image_grid(images, filename, drange, grid_size):
     PIL.Image.fromarray(images, {3: 'RGB', 1: 'L'}[C]).save(filename)
 
 #----------------------------------------------------------------------------
+
+def locate_latest_pkl(result_dir):
+    allpickles = sorted(glob.glob(os.path.join(result_dir, 'network-*.pkl')))
+    if len(allpickles) == 0:
+        return None, 0.0
+    latest_pickle = allpickles[-1]
+    resume_run_id = os.path.basename(os.path.dirname(latest_pickle))
+    RE_KIMG = re.compile('network-snapshot-(\d+).pkl')
+    kimg = int(RE_KIMG.match(os.path.basename(latest_pickle)).group(1))
+    return (latest_pickle, float(kimg))
+
+#----------------------------------------------------------------------------
+
 # Main training script.
 
 def training_loop(
@@ -106,6 +119,7 @@ def training_loop(
     resume_pkl              = None,     # Network pickle to resume training from.
     abort_fn                = None,     # Callback function for determining whether to abort training.
     progress_fn             = None,     # Callback function for updating training progress.
+    resume_kimg             = 0.0
 ):
     assert minibatch_size % (num_gpus * minibatch_gpu) == 0
     start_time = time.time()
@@ -121,6 +135,9 @@ def training_loop(
         G = tflib.Network('G', num_channels=training_set.shape[0], resolution=training_set.shape[1], label_size=training_set.label_size, **G_args)
         D = tflib.Network('D', num_channels=training_set.shape[0], resolution=training_set.shape[1], label_size=training_set.label_size, **D_args)
         Gs = G.clone('Gs')
+        #if resume_pkl == 'latest':
+            #resume_pkl, resume_kimg = misc.locate_latest_pkl(run_dir) 
+            #print(f'Resuming from "{resume_pkl}"')
         if resume_pkl is not None:
             print(f'Resuming from "{resume_pkl}"')
             with dnnlib.util.open_url(resume_pkl) as f:
@@ -220,13 +237,15 @@ def training_loop(
         progress_fn(0, total_kimg)
     tick_start_time = time.time()
     maintenance_time = tick_start_time - start_time
-    cur_nimg = 0
+    #cur_nimg = 0
+    cur_nimg = int(resume_kimg * 1000)
     cur_tick = -1
     tick_start_nimg = cur_nimg
     running_mb_counter = 0
 
     done = False
-    while not done:
+    #while not done:
+    while cur_nimg < total_kimg * 1000:
 
         # Compute EMA decay parameter.
         Gs_nimg = G_smoothing_kimg * 1000.0
@@ -301,7 +320,7 @@ def training_loop(
             # Save snapshots.
             if image_snapshot_ticks is not None and (done or cur_tick % image_snapshot_ticks == 0):
                 grid_fakes = Gs.run(grid_latents, grid_labels, is_validation=True, minibatch_size=minibatch_gpu)
-                save_image_grid(grid_fakes, os.path.join(run_dir, f'fakes{cur_nimg // 1000:06d}.png'), drange=[-1,1], grid_size=grid_size)
+                save_image_grid(grid_fakes, os.path.join(run_dir, f'fakes{cur_nimg // 1000:06d}.jpg'), drange=[-1,1], grid_size=grid_size)
             if network_snapshot_ticks is not None and (done or cur_tick % network_snapshot_ticks == 0):
                 pkl = os.path.join(run_dir, f'network-snapshot-{cur_nimg // 1000:06d}.pkl')
                 with open(pkl, 'wb') as f:
