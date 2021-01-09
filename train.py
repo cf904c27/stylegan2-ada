@@ -176,10 +176,13 @@ def setup_training_options(
         spec.ref_gpus = gpus
         spec.mb = max(min(gpus * min(4096 // res, 32), 64), gpus) # keep gpu memory consumption at bay
         spec.mbstd = min(spec.mb // gpus, 4) # other hyperparams behave more predictably if mbstd group size remains fixed
-        spec.fmaps = 1 if res >= 512 else 0.5
+        spec.fmaps = 2 if res >= 512 else 0.5 #1 -> 2
         spec.lrate = 0.002 if res >= 1024 else 0.0025
         spec.gamma = 0.0002 * (res ** 2) / spec.mb # heuristic formula
         spec.ema = spec.mb * 10 / 32
+        # https://aydao.ai/experiment/2020/12/05/dbstylegan512.html
+        args.loss_args.pl_weight = 0 # disable path length regularization
+        args.G_args.style_mixing_prob = None
 
     args.total_kimg = spec.kimg
     args.minibatch_size = spec.mb
