@@ -176,7 +176,7 @@ def setup_training_options(
         spec.ref_gpus = gpus
         spec.mb = max(min(gpus * min(4096 // res, 32), 64), gpus) # keep gpu memory consumption at bay
         spec.mbstd = min(spec.mb // gpus, 4) # other hyperparams behave more predictably if mbstd group size remains fixed
-        spec.fmaps = 2 if res >= 512 else 0.5 #1 -> 2
+        spec.fmaps = 1 if res >= 512 else 0.5 #1 -> 2
         spec.lrate = 0.002 if res >= 1024 else 0.0025
         spec.gamma = 0.0002 * (res ** 2) / spec.mb # heuristic formula
         spec.ema = spec.mb * 10 / 32
@@ -188,7 +188,7 @@ def setup_training_options(
     args.minibatch_size = spec.mb
     args.minibatch_gpu = spec.mb // spec.ref_gpus
     args.D_args.mbstd_group_size = spec.mbstd
-    args.G_args.fmap_base = args.D_args.fmap_base = int(spec.fmaps * 16384)
+    args.G_args.fmap_base = args.D_args.fmap_base = 32768 #int(spec.fmaps * 16384)
     args.G_args.fmap_max = args.D_args.fmap_max = 512
     args.G_opt_args.learning_rate = args.D_opt_args.learning_rate = spec.lrate
     args.loss_args.r1_gamma = spec.gamma
